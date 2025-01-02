@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>얼굴 비교</title>
+  <title>얼굴 비교 (2D)</title>
   <style>
     body {
       font-family: 'Apple SD Gothic Neo', Arial, sans-serif;
@@ -101,11 +101,11 @@
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface"></script>
 </head>
 <body>
   <div class="container">
-    <h2>얼굴 비교</h2>
+    <h2>얼굴 비교 (2D)</h2>
     <p>두 개의 얼굴 사진을 업로드하여 비교해 보세요.</p>
     
     <label for="image1">첫 번째 이미지 업로드</label>
@@ -123,17 +123,16 @@
     <div id="face-info"></div>
 
     <div class="footer">
-      <p>얼굴 비교 기능은 TensorFlow.js를 사용하여 구현되었습니다.</p>
+      <p>얼굴 비교 기능은 TensorFlow.js와 Blazeface를 사용하여 구현되었습니다.</p>
     </div>
   </div>
 
   <script>
-    let face1Landmarks, face2Landmarks;
+    let face1Embedding, face2Embedding;
 
     // 모델 로딩
     async function loadModel() {
-      // Model 로딩 시 mediapipeFacemesh 사용하지 않고 지원되는 패키지로 로드
-      const model = await faceLandmarksDetection.load(faceLandmarksDetection.SupportedPackages.mediapipeFacemesh);
+      const model = await blazeface.load();
       console.log("모델 로드 완료");
       return model;
     }
@@ -161,13 +160,13 @@
           const predictions = await detectFace(img, model, ctx, canvas);
 
           if (id === 'image1') {
-            face1Landmarks = predictions;
+            face1Embedding = predictions;
           } else {
-            face2Landmarks = predictions;
+            face2Embedding = predictions;
           }
 
           // 두 얼굴이 다 준비되었을 때 비교 시작
-          if (face1Landmarks && face2Landmarks) {
+          if (face1Embedding && face2Embedding) {
             compareFaces();
           }
         };
@@ -178,12 +177,11 @@
 
     // 얼굴 탐지
     async function detectFace(image, model, ctx, canvas) {
-      const predictions = await model.estimateFaces({
-        input: image
-      });
+      const input = tf.browser.fromPixels(image);
+      const predictions = await model.estimateFaces(input);
 
       if (predictions.length > 0) {
-        return predictions[0].scaledMesh; // 3D landmark 반환
+        return predictions[0].landmarks;
       }
 
       return null;
@@ -194,28 +192,26 @@
       const resultContainer = document.getElementById('result-container');
       const faceInfoContainer = document.getElementById('face-info');
       
-      if (face1Landmarks && face2Landmarks) {
-        const distance = calculateDistance(face1Landmarks, face2Landmarks);
-        const similarity = distance < 50 ? "같은 사람입니다!" : "다른 사람입니다.";
+      if (face1Embedding && face2Embedding) {
+        const distance = calculateDistance(face1Embedding, face2Embedding);
+        const similarity = distance < 350 ? "같은 사람입니다!" : "다른 사람입니다.";
 
         resultContainer.innerHTML = `<div class='result'>${similarity}</div>`;
 
         // 얼굴 정보 표시 (얼굴 좌표와 유사도)
         faceInfoContainer.innerHTML = `
-          <div><strong>첫 번째 이미지 얼굴 위치:</strong> ${JSON.stringify(face1Landmarks)}</div>
-          <div><strong>두 번째 이미지 얼굴 위치:</strong> ${JSON.stringify(face2Landmarks)}</div>
+          <div><strong>첫 번째 이미지 얼굴 위치:</strong> ${JSON.stringify(face1Embedding)}</div>
+          <div><strong>두 번째 이미지 얼굴 위치:</strong> ${JSON.stringify(face2Embedding)}</div>
           <div><strong>얼굴 유사도 (거리):</strong> ${distance.toFixed(2)}</div>
         `;
       }
     }
 
     // 유클리드 거리 계산 (얼굴 유사도 계산)
-    function calculateDistance(landmarks1, landmarks2) {
+    function calculateDistance(embedding1, embedding2) {
       let distance = 0;
-      for (let i = 0; i < landmarks1.length; i++) {
-        distance += Math.pow(landmarks1[i][0] - landmarks2[i][0], 2);
-        distance += Math.pow(landmarks1[i][1] - landmarks2[i][1], 2);
-        distance += Math.pow(landmarks1[i][2] - landmarks2[i][2], 2);
+      for (let i = 0; i < embedding1.length; i++) {
+        distance += Math.pow(embedding1[i][0] - embedding2[i][0], 2);
       }
       return Math.sqrt(distance);
     }
