@@ -68,6 +68,11 @@
       font-size: 0.9rem;
       color: #777;
     }
+
+    canvas {
+      position: absolute;
+      pointer-events: none;
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface"></script>
@@ -117,14 +122,22 @@
         img.onload = async () => {
           document.getElementById(`${id}-preview`).src = img.src;
 
+          // 캔버스에 이미지를 그려서 얼굴 범위를 표시
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          document.body.appendChild(canvas);
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, img.width, img.height);
+
           // 얼굴 감지
           const model = await loadModel();
-          const embeddings = await detectFace(img, model);
+          const predictions = await detectFace(img, model, ctx, canvas);
 
           if (id === 'image1') {
-            face1Embedding = embeddings;
+            face1Embedding = predictions;
           } else {
-            face2Embedding = embeddings;
+            face2Embedding = predictions;
           }
 
           // 두 이미지 모두 로드되었을 때 비교
@@ -133,19 +146,28 @@
           }
         };
       };
-      
+
       reader.readAsDataURL(file);
     }
 
     // 얼굴 감지 및 임베딩 추출
-    async function detectFace(image, model) {
+    async function detectFace(image, model, ctx, canvas) {
       const input = tf.browser.fromPixels(image);
       const predictions = await model.estimateFaces(input);
 
       if (predictions.length > 0) {
-        const face = predictions[0]; // 첫 번째 얼굴 추출 (단일 얼굴 비교)
-        const faceEmbedding = face.landmarks;
-        return faceEmbedding;
+        predictions.forEach((prediction) => {
+          // 얼굴 영역 표시
+          const topLeft = prediction.topLeft;
+          const bottomRight = prediction.bottomRight;
+          ctx.beginPath();
+          ctx.lineWidth = "4";
+          ctx.strokeStyle = "red";
+          ctx.rect(topLeft[0], topLeft[1], bottomRight[0] - topLeft[0], bottomRight[1] - topLeft[1]);
+          ctx.stroke();
+        });
+
+        return predictions[0].landmarks;
       }
 
       return null;
