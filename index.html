@@ -5,10 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>얼굴 비교</title>
   <style>
-    /* 기본 스타일 */
     body {
-      font-family: 'Helvetica Neue', Arial, sans-serif;
-      background-color: #f4f7fc;
+      font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -18,17 +17,15 @@
 
     .container {
       background-color: white;
+      padding: 20px;
       border-radius: 10px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      width: 80%;
+      width: 90%;
       max-width: 600px;
-      padding: 40px;
       text-align: center;
     }
 
     h2 {
-      font-size: 1.8rem;
-      color: #333;
       margin-bottom: 20px;
     }
 
@@ -37,45 +34,33 @@
     }
 
     .upload-btn {
-      background-color: #3b82f6;
+      padding: 10px 20px;
+      background-color: #4CAF50;
       color: white;
-      padding: 12px 24px;
-      border-radius: 6px;
-      font-size: 1rem;
+      border-radius: 5px;
       cursor: pointer;
-      margin-bottom: 20px;
-      transition: background-color 0.3s;
+      font-size: 1rem;
     }
 
-    .upload-btn:hover {
-      background-color: #2563eb;
+    .image-container {
+      margin-top: 20px;
+      display: flex;
+      justify-content: space-around;
     }
 
-    .image-preview {
-      width: 100%;
-      height: auto;
-      margin: 10px 0;
+    img {
+      max-width: 200px;
+      max-height: 200px;
       border-radius: 8px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
     }
 
     .result {
       margin-top: 20px;
       padding: 10px;
-      background-color: #e1f5fe;
-      border-radius: 6px;
-      font-size: 1.2rem;
-      color: #0277bd;
-    }
-
-    .result.same {
-      background-color: #a5d6a7;
-      color: #388e3c;
-    }
-
-    .result.different {
-      background-color: #ffccbc;
-      color: #d32f2f;
+      background-color: #f8d7da;
+      color: #721c24;
+      border-radius: 5px;
     }
 
     .footer {
@@ -84,97 +69,109 @@
       color: #777;
     }
   </style>
-  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface"></script>
 </head>
 <body>
   <div class="container">
     <h2>얼굴 비교</h2>
     <p>두 개의 얼굴 사진을 업로드하여 비교해 보세요.</p>
-
-    <div>
-      <input type="file" id="image1" accept="image/*" onchange="loadImage(event, 'image1')">
-      <label for="image1" class="upload-btn">첫 번째 이미지 업로드</label>
-    </div>
     
-    <div>
-      <input type="file" id="image2" accept="image/*" onchange="loadImage(event, 'image2')">
-      <label for="image2" class="upload-btn">두 번째 이미지 업로드</label>
-    </div>
+    <label class="upload-btn" for="image1">첫 번째 이미지 업로드</label>
+    <input type="file" id="image1" accept="image/*" onchange="loadImage(event, 'image1')">
 
-    <div id="image1-preview-container">
-      <img id="image1-preview" class="image-preview" />
-    </div>
+    <label class="upload-btn" for="image2">두 번째 이미지 업로드</label>
+    <input type="file" id="image2" accept="image/*" onchange="loadImage(event, 'image2')">
 
-    <div id="image2-preview-container">
-      <img id="image2-preview" class="image-preview" />
+    <div class="image-container">
+      <img id="image1-preview" alt="첫 번째 이미지">
+      <img id="image2-preview" alt="두 번째 이미지">
     </div>
 
     <div id="result-container"></div>
 
     <div class="footer">
-      <p>얼굴 비교 기능은 `face-api.js`를 사용하여 구현되었습니다.</p>
+      <p>얼굴 비교 기능은 TensorFlow.js를 사용하여 구현되었습니다.</p>
     </div>
   </div>
 
   <script>
-    async function loadModels() {
-      await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
-      await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
-      await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+    let face1Embedding, face2Embedding;
+
+    // 모델 로드
+    async function loadModel() {
+      const model = await blazeface.load();
+      console.log("모델 로드 완료");
+      return model;
     }
 
-    // 이미지 로드 함수
-    function loadImage(event, id) {
+    // 이미지 로드 및 얼굴 감지
+    async function loadImage(event, id) {
       const file = event.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = async function() {
-          const img = new Image();
-          img.src = reader.result;
-          img.onload = () => {
-            document.getElementById(`${id}-preview`).src = img.src;
-            if (id === 'image1') {
-              compareFaces(img, document.getElementById('image2-preview').src);
-            } else {
-              compareFaces(document.getElementById('image1-preview').src, img);
-            }
-          };
+      const reader = new FileReader();
+
+      reader.onload = async function() {
+        const img = new Image();
+        img.src = reader.result;
+
+        img.onload = async () => {
+          document.getElementById(`${id}-preview`).src = img.src;
+
+          // 얼굴 감지
+          const model = await loadModel();
+          const embeddings = await detectFace(img, model);
+
+          if (id === 'image1') {
+            face1Embedding = embeddings;
+          } else {
+            face2Embedding = embeddings;
+          }
+
+          // 두 이미지 모두 로드되었을 때 비교
+          if (face1Embedding && face2Embedding) {
+            compareFaces();
+          }
         };
-        reader.readAsDataURL(file);
-      }
-    }
-
-    // 얼굴 비교 함수
-    async function compareFaces(image1, image2) {
-      if (!image1 || !image2) return;
-
-      const img1 = await faceapi.bufferToImage(image1);
-      const img2 = await faceapi.bufferToImage(image2);
+      };
       
-      const detections1 = await faceapi.detectSingleFace(img1).withFaceLandmarks().withFaceDescriptor();
-      const detections2 = await faceapi.detectSingleFace(img2).withFaceLandmarks().withFaceDescriptor();
-
-      if (!detections1 || !detections2) {
-        displayResult('얼굴을 찾을 수 없습니다.', 'different');
-        return;
-      }
-
-      const distance = faceapi.euclideanDistance(detections1.descriptor, detections2.descriptor);
-      if (distance < 0.6) {
-        displayResult('같은 사람입니다!', 'same');
-      } else {
-        displayResult('다른 사람입니다.', 'different');
-      }
+      reader.readAsDataURL(file);
     }
 
-    // 결과 표시 함수
-    function displayResult(message, resultClass) {
+    // 얼굴 감지 및 임베딩 추출
+    async function detectFace(image, model) {
+      const input = tf.browser.fromPixels(image);
+      const predictions = await model.estimateFaces(input);
+
+      if (predictions.length > 0) {
+        const face = predictions[0]; // 첫 번째 얼굴 추출 (단일 얼굴 비교)
+        const faceEmbedding = face.landmarks;
+        return faceEmbedding;
+      }
+
+      return null;
+    }
+
+    // 얼굴 비교 (임베딩 비교)
+    function compareFaces() {
       const resultContainer = document.getElementById('result-container');
-      resultContainer.innerHTML = `<div class="result ${resultClass}">${message}</div>`;
+      if (face1Embedding && face2Embedding) {
+        const distance = calculateDistance(face1Embedding, face2Embedding);
+        if (distance < 50) {
+          resultContainer.innerHTML = "<div class='result'>같은 사람입니다!</div>";
+        } else {
+          resultContainer.innerHTML = "<div class='result'>다른 사람입니다.</div>";
+        }
+      }
     }
 
-    // 페이지 로드 시 모델 로드
-    window.onload = loadModels;
+    // 두 임베딩 사이의 유사도(거리) 계산
+    function calculateDistance(embedding1, embedding2) {
+      let distance = 0;
+      for (let i = 0; i < embedding1.length; i++) {
+        distance += Math.pow(embedding1[i][0] - embedding2[i][0], 2);
+      }
+      return Math.sqrt(distance);
+    }
   </script>
 </body>
 </html>
