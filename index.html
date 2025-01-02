@@ -123,14 +123,14 @@
     <div id="face-info"></div>
 
     <div class="footer">
-      <p>얼굴 비교 기능은 TensorFlow.js와 MediaPipe Face Mesh를 사용하여 구현되었습니다.</p>
+      <p>얼굴 비교 기능은 TensorFlow.js를 사용하여 구현되었습니다.</p>
     </div>
   </div>
 
   <script>
     let face1Landmarks, face2Landmarks;
 
-    // 모델 로드
+    // 모델 로딩
     async function loadModel() {
       const model = await faceLandmarksDetection.load(faceLandmarksDetection.SupportedPackages.mediapipeFacemesh);
       console.log("모델 로드 완료");
@@ -150,8 +150,14 @@
           document.getElementById(`${id}-preview`).style.display = "block";
           document.getElementById(`${id}-preview`).src = img.src;
 
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, img.width, img.height);
+
           const model = await loadModel();
-          const predictions = await detectFace(img, model);
+          const predictions = await detectFace(img, model, ctx, canvas);
 
           if (id === 'image1') {
             face1Landmarks = predictions;
@@ -170,11 +176,15 @@
     }
 
     // 얼굴 탐지
-    async function detectFace(image, model) {
-      const predictions = await model.estimateFaces({input: image});
+    async function detectFace(image, model, ctx, canvas) {
+      const predictions = await model.estimateFaces({
+        input: image
+      });
+
       if (predictions.length > 0) {
-        return predictions[0].scaledMesh;  // 3D 랜드마크 반환
+        return predictions[0].scaledMesh;
       }
+
       return null;
     }
 
@@ -204,7 +214,7 @@
       for (let i = 0; i < landmarks1.length; i++) {
         distance += Math.pow(landmarks1[i][0] - landmarks2[i][0], 2);
         distance += Math.pow(landmarks1[i][1] - landmarks2[i][1], 2);
-        distance += Math.pow(landmarks1[i][2] - landmarks2[i][2], 2);  // 3D 거리 계산
+        distance += Math.pow(landmarks1[i][2] - landmarks2[i][2], 2);
       }
       return Math.sqrt(distance);
     }
