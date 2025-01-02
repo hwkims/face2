@@ -101,7 +101,7 @@
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection"></script>
 </head>
 <body>
   <div class="container">
@@ -123,16 +123,16 @@
     <div id="face-info"></div>
 
     <div class="footer">
-      <p>얼굴 비교 기능은 TensorFlow.js를 사용하여 구현되었습니다.</p>
+      <p>얼굴 비교 기능은 TensorFlow.js와 MediaPipe Face Mesh를 사용하여 구현되었습니다.</p>
     </div>
   </div>
 
   <script>
-    let face1Embedding, face2Embedding;
+    let face1Landmarks, face2Landmarks;
 
-    // 모델 로딩
+    // 모델 로드
     async function loadModel() {
-      const model = await blazeface.load();
+      const model = await faceLandmarksDetection.load(faceLandmarksDetection.SupportedPackages.mediapipeFacemesh);
       console.log("모델 로드 완료");
       return model;
     }
@@ -150,23 +150,17 @@
           document.getElementById(`${id}-preview`).style.display = "block";
           document.getElementById(`${id}-preview`).src = img.src;
 
-          const canvas = document.createElement("canvas");
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, img.width, img.height);
-
           const model = await loadModel();
-          const predictions = await detectFace(img, model, ctx, canvas);
+          const predictions = await detectFace(img, model);
 
           if (id === 'image1') {
-            face1Embedding = predictions;
+            face1Landmarks = predictions;
           } else {
-            face2Embedding = predictions;
+            face2Landmarks = predictions;
           }
 
           // 두 얼굴이 다 준비되었을 때 비교 시작
-          if (face1Embedding && face2Embedding) {
+          if (face1Landmarks && face2Landmarks) {
             compareFaces();
           }
         };
@@ -176,14 +170,11 @@
     }
 
     // 얼굴 탐지
-    async function detectFace(image, model, ctx, canvas) {
-      const input = tf.browser.fromPixels(image);
-      const predictions = await model.estimateFaces(input);
-
+    async function detectFace(image, model) {
+      const predictions = await model.estimateFaces({input: image});
       if (predictions.length > 0) {
-        return predictions[0].landmarks;
+        return predictions[0].scaledMesh;  // 3D 랜드마크 반환
       }
-
       return null;
     }
 
@@ -192,26 +183,28 @@
       const resultContainer = document.getElementById('result-container');
       const faceInfoContainer = document.getElementById('face-info');
       
-      if (face1Embedding && face2Embedding) {
-        const distance = calculateDistance(face1Embedding, face2Embedding);
+      if (face1Landmarks && face2Landmarks) {
+        const distance = calculateDistance(face1Landmarks, face2Landmarks);
         const similarity = distance < 50 ? "같은 사람입니다!" : "다른 사람입니다.";
 
         resultContainer.innerHTML = `<div class='result'>${similarity}</div>`;
 
         // 얼굴 정보 표시 (얼굴 좌표와 유사도)
         faceInfoContainer.innerHTML = `
-          <div><strong>첫 번째 이미지 얼굴 위치:</strong> ${JSON.stringify(face1Embedding)}</div>
-          <div><strong>두 번째 이미지 얼굴 위치:</strong> ${JSON.stringify(face2Embedding)}</div>
+          <div><strong>첫 번째 이미지 얼굴 위치:</strong> ${JSON.stringify(face1Landmarks)}</div>
+          <div><strong>두 번째 이미지 얼굴 위치:</strong> ${JSON.stringify(face2Landmarks)}</div>
           <div><strong>얼굴 유사도 (거리):</strong> ${distance.toFixed(2)}</div>
         `;
       }
     }
 
     // 유클리드 거리 계산 (얼굴 유사도 계산)
-    function calculateDistance(embedding1, embedding2) {
+    function calculateDistance(landmarks1, landmarks2) {
       let distance = 0;
-      for (let i = 0; i < embedding1.length; i++) {
-        distance += Math.pow(embedding1[i][0] - embedding2[i][0], 2);
+      for (let i = 0; i < landmarks1.length; i++) {
+        distance += Math.pow(landmarks1[i][0] - landmarks2[i][0], 2);
+        distance += Math.pow(landmarks1[i][1] - landmarks2[i][1], 2);
+        distance += Math.pow(landmarks1[i][2] - landmarks2[i][2], 2);  // 3D 거리 계산
       }
       return Math.sqrt(distance);
     }
