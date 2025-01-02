@@ -132,6 +132,7 @@
 
     // 모델 로딩
     async function loadModel() {
+      // Model 로딩 시 mediapipeFacemesh 사용하지 않고 지원되는 패키지로 로드
       const model = await faceLandmarksDetection.load(faceLandmarksDetection.SupportedPackages.mediapipeFacemesh);
       console.log("모델 로드 완료");
       return model;
@@ -182,7 +183,7 @@
       });
 
       if (predictions.length > 0) {
-        return predictions[0].scaledMesh;
+        return predictions[0].scaledMesh; // 3D landmark 반환
       }
 
       return null;
