@@ -93,9 +93,11 @@
       color: #777;
     }
 
-    canvas {
-      position: absolute;
-      pointer-events: none;
+    .face-info {
+      margin-top: 20px;
+      text-align: left;
+      font-size: 1rem;
+      color: #333;
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
@@ -118,6 +120,7 @@
     </div>
 
     <div id="result-container"></div>
+    <div id="face-info"></div>
 
     <div class="footer">
       <p>얼굴 비교 기능은 TensorFlow.js를 사용하여 구현되었습니다.</p>
@@ -174,16 +177,6 @@
       const predictions = await model.estimateFaces(input);
 
       if (predictions.length > 0) {
-        predictions.forEach((prediction) => {
-          const topLeft = prediction.topLeft;
-          const bottomRight = prediction.bottomRight;
-          ctx.beginPath();
-          ctx.lineWidth = "4";
-          ctx.strokeStyle = "red";
-          ctx.rect(topLeft[0], topLeft[1], bottomRight[0] - topLeft[0], bottomRight[1] - topLeft[1]);
-          ctx.stroke();
-        });
-
         return predictions[0].landmarks;
       }
 
@@ -192,6 +185,8 @@
 
     function compareFaces() {
       const resultContainer = document.getElementById('result-container');
+      const faceInfoContainer = document.getElementById('face-info');
+      
       if (face1Embedding && face2Embedding) {
         const distance = calculateDistance(face1Embedding, face2Embedding);
         if (distance < 50) {
@@ -199,6 +194,13 @@
         } else {
           resultContainer.innerHTML = "<div class='result'>다른 사람입니다.</div>";
         }
+
+        // 얼굴 정보 표시
+        faceInfoContainer.innerHTML = `
+          <div><strong>첫 번째 이미지 좌표:</strong> ${JSON.stringify(face1Embedding)}</div>
+          <div><strong>두 번째 이미지 좌표:</strong> ${JSON.stringify(face2Embedding)}</div>
+          <div><strong>유사도 (거리):</strong> ${distance.toFixed(2)}</div>
+        `;
       }
     }
 
