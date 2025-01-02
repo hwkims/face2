@@ -6,65 +6,89 @@
   <title>얼굴 비교</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background-color: #f5f5f5;
+      font-family: 'Apple SD Gothic Neo', Arial, sans-serif;
+      background-color: #f9f9f9;
+      margin: 0;
       display: flex;
       justify-content: center;
       align-items: center;
       height: 100vh;
-      margin: 0;
     }
 
     .container {
       background-color: white;
       padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      width: 90%;
-      max-width: 600px;
+      border-radius: 20px;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+      max-width: 800px;
+      width: 100%;
       text-align: center;
+      overflow: hidden;
     }
 
     h2 {
+      font-size: 1.8rem;
+      color: #333;
       margin-bottom: 20px;
+    }
+
+    p {
+      font-size: 1rem;
+      color: #555;
+    }
+
+    label {
+      padding: 12px 30px;
+      background-color: #007aff;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      margin: 10px 0;
+      display: inline-block;
+      transition: background-color 0.3s ease;
+    }
+
+    label:hover {
+      background-color: #005bb5;
     }
 
     input[type="file"] {
       display: none;
     }
 
-    .upload-btn {
-      padding: 10px 20px;
-      background-color: #4CAF50;
-      color: white;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 1rem;
-    }
-
     .image-container {
       margin-top: 20px;
       display: flex;
-      justify-content: space-around;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
     }
 
     img {
-      max-width: 200px;
-      max-height: 200px;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      max-width: 100%;
+      max-height: 250px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      transition: transform 0.3s ease;
+    }
+
+    img:hover {
+      transform: scale(1.05);
     }
 
     .result {
       margin-top: 20px;
-      padding: 10px;
-      background-color: #f8d7da;
-      color: #721c24;
-      border-radius: 5px;
+      padding: 15px;
+      background-color: #d4edda;
+      color: #155724;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      font-weight: bold;
     }
 
     .footer {
-      margin-top: 30px;
+      margin-top: 40px;
       font-size: 0.9rem;
       color: #777;
     }
@@ -82,10 +106,10 @@
     <h2>얼굴 비교</h2>
     <p>두 개의 얼굴 사진을 업로드하여 비교해 보세요.</p>
     
-    <label class="upload-btn" for="image1">첫 번째 이미지 업로드</label>
+    <label for="image1">첫 번째 이미지 업로드</label>
     <input type="file" id="image1" accept="image/*" onchange="loadImage(event, 'image1')">
 
-    <label class="upload-btn" for="image2">두 번째 이미지 업로드</label>
+    <label for="image2">두 번째 이미지 업로드</label>
     <input type="file" id="image2" accept="image/*" onchange="loadImage(event, 'image2')">
 
     <div class="image-container">
@@ -103,14 +127,12 @@
   <script>
     let face1Embedding, face2Embedding;
 
-    // 모델 로드
     async function loadModel() {
       const model = await blazeface.load();
       console.log("모델 로드 완료");
       return model;
     }
 
-    // 이미지 로드 및 얼굴 감지
     async function loadImage(event, id) {
       const file = event.target.files[0];
       const reader = new FileReader();
@@ -122,7 +144,6 @@
         img.onload = async () => {
           document.getElementById(`${id}-preview`).src = img.src;
 
-          // 캔버스에 이미지를 그려서 얼굴 범위를 표시
           const canvas = document.createElement("canvas");
           canvas.width = img.width;
           canvas.height = img.height;
@@ -130,7 +151,6 @@
           const ctx = canvas.getContext("2d");
           ctx.drawImage(img, 0, 0, img.width, img.height);
 
-          // 얼굴 감지
           const model = await loadModel();
           const predictions = await detectFace(img, model, ctx, canvas);
 
@@ -140,7 +160,6 @@
             face2Embedding = predictions;
           }
 
-          // 두 이미지 모두 로드되었을 때 비교
           if (face1Embedding && face2Embedding) {
             compareFaces();
           }
@@ -150,14 +169,12 @@
       reader.readAsDataURL(file);
     }
 
-    // 얼굴 감지 및 임베딩 추출
     async function detectFace(image, model, ctx, canvas) {
       const input = tf.browser.fromPixels(image);
       const predictions = await model.estimateFaces(input);
 
       if (predictions.length > 0) {
         predictions.forEach((prediction) => {
-          // 얼굴 영역 표시
           const topLeft = prediction.topLeft;
           const bottomRight = prediction.bottomRight;
           ctx.beginPath();
@@ -173,7 +190,6 @@
       return null;
     }
 
-    // 얼굴 비교 (임베딩 비교)
     function compareFaces() {
       const resultContainer = document.getElementById('result-container');
       if (face1Embedding && face2Embedding) {
@@ -186,7 +202,6 @@
       }
     }
 
-    // 두 임베딩 사이의 유사도(거리) 계산
     function calculateDistance(embedding1, embedding2) {
       let distance = 0;
       for (let i = 0; i < embedding1.length; i++) {
